@@ -61,6 +61,30 @@
 // *****************************************************************************
 // *****************************************************************************
 
+/*** Macros for FPP_D5 pin ***/
+#define FPP_D5_Set()               (LATESET = (1<<5))
+#define FPP_D5_Clear()             (LATECLR = (1<<5))
+#define FPP_D5_Toggle()            (LATEINV= (1<<5))
+#define FPP_D5_Get()               ((PORTE >> 5) & 0x1)
+#define FPP_D5_OutputEnable()      (TRISECLR = (1<<5))
+#define FPP_D5_InputEnable()       (TRISESET = (1<<5))
+#define FPP_D5_PIN                  GPIO_PIN_RE5
+/*** Macros for FPP_D6 pin ***/
+#define FPP_D6_Set()               (LATESET = (1<<6))
+#define FPP_D6_Clear()             (LATECLR = (1<<6))
+#define FPP_D6_Toggle()            (LATEINV= (1<<6))
+#define FPP_D6_Get()               ((PORTE >> 6) & 0x1)
+#define FPP_D6_OutputEnable()      (TRISECLR = (1<<6))
+#define FPP_D6_InputEnable()       (TRISESET = (1<<6))
+#define FPP_D6_PIN                  GPIO_PIN_RE6
+/*** Macros for FPP_D7 pin ***/
+#define FPP_D7_Set()               (LATESET = (1<<7))
+#define FPP_D7_Clear()             (LATECLR = (1<<7))
+#define FPP_D7_Toggle()            (LATEINV= (1<<7))
+#define FPP_D7_Get()               ((PORTE >> 7) & 0x1)
+#define FPP_D7_OutputEnable()      (TRISECLR = (1<<7))
+#define FPP_D7_InputEnable()       (TRISESET = (1<<7))
+#define FPP_D7_PIN                  GPIO_PIN_RE7
 /*** Macros for FPIO3 pin ***/
 #define FPIO3_Set()               (LATGSET = (1<<6))
 #define FPIO3_Clear()             (LATGCLR = (1<<6))
@@ -181,6 +205,22 @@
 #define FPIO2_OutputEnable()      (TRISFCLR = (1<<4))
 #define FPIO2_InputEnable()       (TRISFSET = (1<<4))
 #define FPIO2_PIN                  GPIO_PIN_RF4
+/*** Macros for FPP_DREQ pin ***/
+#define FPP_DREQ_Set()               (LATDSET = (1<<9))
+#define FPP_DREQ_Clear()             (LATDCLR = (1<<9))
+#define FPP_DREQ_Toggle()            (LATDINV= (1<<9))
+#define FPP_DREQ_Get()               ((PORTD >> 9) & 0x1)
+#define FPP_DREQ_OutputEnable()      (TRISDCLR = (1<<9))
+#define FPP_DREQ_InputEnable()       (TRISDSET = (1<<9))
+#define FPP_DREQ_PIN                  GPIO_PIN_RD9
+/*** Macros for FPP_DRDY pin ***/
+#define FPP_DRDY_Set()               (LATDSET = (1<<11))
+#define FPP_DRDY_Clear()             (LATDCLR = (1<<11))
+#define FPP_DRDY_Toggle()            (LATDINV= (1<<11))
+#define FPP_DRDY_Get()               ((PORTD >> 11) & 0x1)
+#define FPP_DRDY_OutputEnable()      (TRISDCLR = (1<<11))
+#define FPP_DRDY_InputEnable()       (TRISDSET = (1<<11))
+#define FPP_DRDY_PIN                  GPIO_PIN_RD11
 /*** Macros for LED0 pin ***/
 #define LED0_Set()               (LATCSET = (1<<13))
 #define LED0_Clear()             (LATCCLR = (1<<13))
@@ -205,6 +245,62 @@
 #define LDACn_OutputEnable()      (TRISDCLR = (1<<2))
 #define LDACn_InputEnable()       (TRISDSET = (1<<2))
 #define LDACn_PIN                  GPIO_PIN_RD2
+/*** Macros for FPP_NC0 pin ***/
+#define FPP_NC0_Set()               (LATDSET = (1<<4))
+#define FPP_NC0_Clear()             (LATDCLR = (1<<4))
+#define FPP_NC0_Toggle()            (LATDINV= (1<<4))
+#define FPP_NC0_Get()               ((PORTD >> 4) & 0x1)
+#define FPP_NC0_OutputEnable()      (TRISDCLR = (1<<4))
+#define FPP_NC0_InputEnable()       (TRISDSET = (1<<4))
+#define FPP_NC0_PIN                  GPIO_PIN_RD4
+/*** Macros for FPP_NC1 pin ***/
+#define FPP_NC1_Set()               (LATDSET = (1<<5))
+#define FPP_NC1_Clear()             (LATDCLR = (1<<5))
+#define FPP_NC1_Toggle()            (LATDINV= (1<<5))
+#define FPP_NC1_Get()               ((PORTD >> 5) & 0x1)
+#define FPP_NC1_OutputEnable()      (TRISDCLR = (1<<5))
+#define FPP_NC1_InputEnable()       (TRISDSET = (1<<5))
+#define FPP_NC1_PIN                  GPIO_PIN_RD5
+/*** Macros for FPP_D0 pin ***/
+#define FPP_D0_Set()               (LATESET = (1<<0))
+#define FPP_D0_Clear()             (LATECLR = (1<<0))
+#define FPP_D0_Toggle()            (LATEINV= (1<<0))
+#define FPP_D0_Get()               ((PORTE >> 0) & 0x1)
+#define FPP_D0_OutputEnable()      (TRISECLR = (1<<0))
+#define FPP_D0_InputEnable()       (TRISESET = (1<<0))
+#define FPP_D0_PIN                  GPIO_PIN_RE0
+/*** Macros for FPP_D1 pin ***/
+#define FPP_D1_Set()               (LATESET = (1<<1))
+#define FPP_D1_Clear()             (LATECLR = (1<<1))
+#define FPP_D1_Toggle()            (LATEINV= (1<<1))
+#define FPP_D1_Get()               ((PORTE >> 1) & 0x1)
+#define FPP_D1_OutputEnable()      (TRISECLR = (1<<1))
+#define FPP_D1_InputEnable()       (TRISESET = (1<<1))
+#define FPP_D1_PIN                  GPIO_PIN_RE1
+/*** Macros for FPP_D2 pin ***/
+#define FPP_D2_Set()               (LATESET = (1<<2))
+#define FPP_D2_Clear()             (LATECLR = (1<<2))
+#define FPP_D2_Toggle()            (LATEINV= (1<<2))
+#define FPP_D2_Get()               ((PORTE >> 2) & 0x1)
+#define FPP_D2_OutputEnable()      (TRISECLR = (1<<2))
+#define FPP_D2_InputEnable()       (TRISESET = (1<<2))
+#define FPP_D2_PIN                  GPIO_PIN_RE2
+/*** Macros for FPP_D3 pin ***/
+#define FPP_D3_Set()               (LATESET = (1<<3))
+#define FPP_D3_Clear()             (LATECLR = (1<<3))
+#define FPP_D3_Toggle()            (LATEINV= (1<<3))
+#define FPP_D3_Get()               ((PORTE >> 3) & 0x1)
+#define FPP_D3_OutputEnable()      (TRISECLR = (1<<3))
+#define FPP_D3_InputEnable()       (TRISESET = (1<<3))
+#define FPP_D3_PIN                  GPIO_PIN_RE3
+/*** Macros for FPP_D4 pin ***/
+#define FPP_D4_Set()               (LATESET = (1<<4))
+#define FPP_D4_Clear()             (LATECLR = (1<<4))
+#define FPP_D4_Toggle()            (LATEINV= (1<<4))
+#define FPP_D4_Get()               ((PORTE >> 4) & 0x1)
+#define FPP_D4_OutputEnable()      (TRISECLR = (1<<4))
+#define FPP_D4_InputEnable()       (TRISESET = (1<<4))
+#define FPP_D4_PIN                  GPIO_PIN_RE4
 
 
 // *****************************************************************************

@@ -18,8 +18,34 @@
     are defined here for convenience.
 *******************************************************************************/
 
+//DOM-IGNORE-BEGIN
+/*******************************************************************************
+* Copyright (C) 2018 Microchip Technology Inc. and its subsidiaries.
+*
+* Subject to your compliance with these terms, you may use Microchip software
+* and any derivatives exclusively with Microchip products. It is your
+* responsibility to comply with third party license terms applicable to your
+* use of third party software (including open source software) that may
+* accompany Microchip software.
+*
+* THIS SOFTWARE IS SUPPLIED BY MICROCHIP "AS IS". NO WARRANTIES, WHETHER
+* EXPRESS, IMPLIED OR STATUTORY, APPLY TO THIS SOFTWARE, INCLUDING ANY IMPLIED
+* WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY, AND FITNESS FOR A
+* PARTICULAR PURPOSE.
+*
+* IN NO EVENT WILL MICROCHIP BE LIABLE FOR ANY INDIRECT, SPECIAL, PUNITIVE,
+* INCIDENTAL OR CONSEQUENTIAL LOSS, DAMAGE, COST OR EXPENSE OF ANY KIND
+* WHATSOEVER RELATED TO THE SOFTWARE, HOWEVER CAUSED, EVEN IF MICROCHIP HAS
+* BEEN ADVISED OF THE POSSIBILITY OR THE DAMAGES ARE FORESEEABLE. TO THE
+* FULLEST EXTENT ALLOWED BY LAW, MICROCHIP'S TOTAL LIABILITY ON ALL CLAIMS IN
+* ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
+* THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
+ *******************************************************************************/
+//DOM-IGNORE-END
+
 #ifndef _APP_H
 #define _APP_H
+
 
 // *****************************************************************************
 // *****************************************************************************
@@ -32,25 +58,20 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include "configuration.h"
-#include "FreeRTOS.h"
-#include "task.h"
-
-// DOM-IGNORE-BEGIN
-#ifdef __cplusplus  // Provide C++ Compatibility
-
-extern "C" {
-
-#endif
-// DOM-IGNORE-END
+#include "definitions.h"
+#include "comms.h"
 
 // *****************************************************************************
 // *****************************************************************************
 // Section: Type Definitions
 // *****************************************************************************
-// *****************************************************************************
+// ***************************************************************************** 
+#define APP_READ_BUFFER_SIZE                                64
+
+
 
 // *****************************************************************************
-/* Application states
+/* Application States
 
   Summary:
     Application states enumeration
@@ -62,11 +83,26 @@ extern "C" {
 
 typedef enum
 {
-    /* Application's state machine's initial state. */
+    // Application's state machine's initial state.
     APP_STATE_INIT=0,
-    APP_STATE_SERVICE_TASKS,
-    /* TODO: Define states used by the application state machine. */
-
+	
+    // Application waits for device configuration
+    APP_STATE_WAIT_FOR_CONFIGURATION,
+	
+    // Request ADC sample from FPGA
+    APP_STATE_GET_SAMPLE,
+	
+    // Read ADC sample from FPGA
+    APP_STATE_WAIT_SAMPLE,
+	
+    // Send ADC sample over USB
+    APP_STATE_SEND_SAMPLE,
+			
+	// Wait for USB to send
+	APP_STATE_WAIT_USB,
+	
+    // Application Error state
+    APP_STATE_ERROR
 } APP_STATES;
 
 
@@ -85,11 +121,15 @@ typedef enum
 
 typedef struct
 {
-    /* The application's current state */
+    /* Application's current state*/
     APP_STATES state;
-
-    /* TODO: Define any additional data used by the application. */
-
+	
+	cdc_comms_t comms;
+	
+	bool blink_tick;
+	bool comms_tick;
+	
+	int8_t last_sample;
 } APP_DATA;
 
 // *****************************************************************************
@@ -99,6 +139,7 @@ typedef struct
 // *****************************************************************************
 /* These routines are called by drivers when certain events occur.
 */
+
 
 // *****************************************************************************
 // *****************************************************************************
@@ -114,8 +155,8 @@ typedef struct
      MPLAB Harmony application initialization routine.
 
   Description:
-    This function initializes the Harmony application.  It places the
-    application in its initial state and prepares it to run so that its
+    This function initializes the Harmony application.  It places the 
+    application in its initial state and prepares it to run so that its 
     APP_Tasks function can be called.
 
   Precondition:
@@ -170,19 +211,10 @@ void APP_Initialize ( void );
     This routine must be called from SYS_Tasks() routine.
  */
 
-void APP_Tasks( void );
-
+void APP_Tasks ( void );
 
 
 #endif /* _APP_H */
-
-//DOM-IGNORE-BEGIN
-#ifdef __cplusplus
-}
-#endif
-//DOM-IGNORE-END
-
 /*******************************************************************************
  End of File
  */
-

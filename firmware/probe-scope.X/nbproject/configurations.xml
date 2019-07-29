@@ -176,6 +176,7 @@
           <itemPath>../src/packs/PIC32MZ2048EFH064_DFP/device.h</itemPath>
         </logicalFolder>
       </logicalFolder>
+      <itemPath>../src/comms.h</itemPath>
       <itemPath>../src/app.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LinkerScript"
@@ -291,6 +292,7 @@
       <logicalFolder name="f3" displayName="osal" projectFiles="true">
         <itemPath>../src/config/default/osal/osal_freertos.c</itemPath>
       </logicalFolder>
+      <itemPath>../src/comms.c</itemPath>
       <itemPath>../src/main.c</itemPath>
       <itemPath>../src/app.c</itemPath>
     </logicalFolder>

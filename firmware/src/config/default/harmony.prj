@@ -116,7 +116,7 @@
           <LogicalPath dnOrder="2">config/default/</LogicalPath>
           <PhysicalPath dnOrder="3">/</PhysicalPath>
           <GeneratedChecksum dnOrder="4">318A42A786850D06A210A3311BA7F387</GeneratedChecksum>
-          <UserChecksum dnOrder="5">318A42A786850D06A210A3311BA7F387</UserChecksum>
+          <UserChecksum dnOrder="5">787F3D25A248B18341F864EB9EB0A326</UserChecksum>
         </File>
         <File dnOrder="14">
           <Type dnOrder="0">SOURCE</Type>
@@ -147,8 +147,8 @@
           <Name dnOrder="1">main.c</Name>
           <LogicalPath dnOrder="2"/>
           <PhysicalPath dnOrder="3">/../../</PhysicalPath>
-          <GeneratedChecksum dnOrder="4">F81A00E640818EDFB9E79C9BD241AEF4</GeneratedChecksum>
-          <UserChecksum dnOrder="5">F81A00E640818EDFB9E79C9BD241AEF4</UserChecksum>
+          <GeneratedChecksum dnOrder="4"/>
+          <UserChecksum dnOrder="5"/>
         </File>
         <File dnOrder="18">
           <Type dnOrder="0">SOURCE</Type>
@@ -324,7 +324,7 @@
           <LogicalPath dnOrder="2">config/default/</LogicalPath>
           <PhysicalPath dnOrder="3">/</PhysicalPath>
           <GeneratedChecksum dnOrder="4">08B51CD093126943FF0321BBB163B7BC</GeneratedChecksum>
-          <UserChecksum dnOrder="5">08B51CD093126943FF0321BBB163B7BC</UserChecksum>
+          <UserChecksum dnOrder="5">DAC34A86B7A4F8B8882EFB40A155799C</UserChecksum>
         </File>
         <File dnOrder="40">
           <Type dnOrder="0">SOURCE</Type>
@@ -411,8 +411,8 @@
           <Name dnOrder="1">configuration.h</Name>
           <LogicalPath dnOrder="2">config/default/</LogicalPath>
           <PhysicalPath dnOrder="3">/</PhysicalPath>
-          <GeneratedChecksum dnOrder="4">F3991F07A3E617301D66726F49024374</GeneratedChecksum>
-          <UserChecksum dnOrder="5">F3991F07A3E617301D66726F49024374</UserChecksum>
+          <GeneratedChecksum dnOrder="4">58418A142EC9798C8208F1F75480BEAF</GeneratedChecksum>
+          <UserChecksum dnOrder="5">58418A142EC9798C8208F1F75480BEAF</UserChecksum>
         </File>
         <File dnOrder="51">
           <Type dnOrder="0">HEADER</Type>
@@ -428,7 +428,7 @@
           <LogicalPath dnOrder="2">config/default/</LogicalPath>
           <PhysicalPath dnOrder="3">/</PhysicalPath>
           <GeneratedChecksum dnOrder="4">78A0A2115887C1743B31162D3DD0141C</GeneratedChecksum>
-          <UserChecksum dnOrder="5">78A0A2115887C1743B31162D3DD0141C</UserChecksum>
+          <UserChecksum dnOrder="5">6BA1D08AD61BA930CDDDC01F8D34FF98</UserChecksum>
         </File>
         <File dnOrder="53">
           <Type dnOrder="0">HEADER</Type>
@@ -627,8 +627,8 @@
           <Name dnOrder="1">plib_gpio.h</Name>
           <LogicalPath dnOrder="2">config/default/peripheral/gpio/</LogicalPath>
           <PhysicalPath dnOrder="3">/peripheral/gpio/</PhysicalPath>
-          <GeneratedChecksum dnOrder="4">43F3E66F5CA5F7BE0AC285FEA10CBBF5</GeneratedChecksum>
-          <UserChecksum dnOrder="5">43F3E66F5CA5F7BE0AC285FEA10CBBF5</UserChecksum>
+          <GeneratedChecksum dnOrder="4">610E446DC851830EF6A25A2DC7364C50</GeneratedChecksum>
+          <UserChecksum dnOrder="5">610E446DC851830EF6A25A2DC7364C50</UserChecksum>
         </File>
         <File dnOrder="78">
           <Type dnOrder="0">HEADER</Type>
