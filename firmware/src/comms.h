@@ -18,6 +18,9 @@
 #include "definitions.h"
 
 
+#define CDC_READ_BUFFER_SIZE 0x200
+
+
 #ifdef	__cplusplus
 extern "C"
 {
@@ -91,8 +94,8 @@ typedef struct
     cdc_rxtx_state_t transmitState;
 	cdc_rxtx_state_t receiveState;
 	
-	uint32_t transmitBytes;
 	uint32_t receiveBytes;
+	uint32_t receiveBytesTotal;
 
     /* Flag determines SOF event occurrence */
     bool sofEventHasOccurred;
@@ -103,23 +106,21 @@ typedef struct
     /* Application CDC read buffer */
     uint8_t * cdcReadBuffer;
 	uint32_t  cdcReadBufferSize;
-
-    /* Application CDC Write buffer */
-    uint8_t * cdcWriteBuffer;
-	uint32_t  cdcWriteBufferSize;
+	
+	bool rx_auto;
+	bool rx_auto_fail;
+	uint8_t rx_auto_terminator;
+	uint32_t rx_target_bytes;
+	uint8_t * rx_out;
 } cdc_comms_t;
 
-void comms_init (
-	cdc_comms_t *    cdc_comms,
-	SYS_MODULE_INDEX deviceIndex,
-	uint8_t *        readBuffer,
-	uint32_t         readBufferSize,
-	uint8_t *        writeBuffer,
-	uint32_t         writeBufferSize
-);
+void comms_init (cdc_comms_t * cdc_comms, SYS_MODULE_INDEX deviceIndex);
 void comms_task (cdc_comms_t * cdc_comms);
 
-bool comms_transmit (cdc_comms_t * cdc_comms, uint32_t bytes);
+bool comms_transmit (cdc_comms_t * cdc_comms, uint8_t * buffer, uint32_t bytes);
+bool comms_receive (cdc_comms_t * cdc_comms, uint8_t * buffer, uint32_t bytes);
+bool comms_receive_auto (cdc_comms_t * cdc_comms, uint8_t * buffer,
+						 uint32_t bytes, uint8_t terminator);
 
 
 #ifdef	__cplusplus

@@ -1,57 +1,19 @@
-/*******************************************************************************
-  MPLAB Harmony Application Header File
-
-  Company:
-    Microchip Technology Inc.
-
-  File Name:
-    app.h
-
-  Summary:
-    This header file provides prototypes and definitions for the application.
-
-  Description:
-    This header file provides function prototypes and data type definitions for
-    the application.  Some of these are required by the system (such as the
-    "APP_Initialize" and "APP_Tasks" prototypes) and some of them are only used
-    internally by the application (such as the "APP_STATES" definition).  Both
-    are defined here for convenience.
-*******************************************************************************/
-
-//DOM-IGNORE-BEGIN
-/*******************************************************************************
-* Copyright (C) 2018 Microchip Technology Inc. and its subsidiaries.
-*
-* Subject to your compliance with these terms, you may use Microchip software
-* and any derivatives exclusively with Microchip products. It is your
-* responsibility to comply with third party license terms applicable to your
-* use of third party software (including open source software) that may
-* accompany Microchip software.
-*
-* THIS SOFTWARE IS SUPPLIED BY MICROCHIP "AS IS". NO WARRANTIES, WHETHER
-* EXPRESS, IMPLIED OR STATUTORY, APPLY TO THIS SOFTWARE, INCLUDING ANY IMPLIED
-* WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY, AND FITNESS FOR A
-* PARTICULAR PURPOSE.
-*
-* IN NO EVENT WILL MICROCHIP BE LIABLE FOR ANY INDIRECT, SPECIAL, PUNITIVE,
-* INCIDENTAL OR CONSEQUENTIAL LOSS, DAMAGE, COST OR EXPENSE OF ANY KIND
-* WHATSOEVER RELATED TO THE SOFTWARE, HOWEVER CAUSED, EVEN IF MICROCHIP HAS
-* BEEN ADVISED OF THE POSSIBILITY OR THE DAMAGES ARE FORESEEABLE. TO THE
-* FULLEST EXTENT ALLOWED BY LAW, MICROCHIP'S TOTAL LIABILITY ON ALL CLAIMS IN
-* ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
-* THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
- *******************************************************************************/
-//DOM-IGNORE-END
+/*
+ * Main Probe-Scope Application
+ * 
+ * @Company
+ *   Probe-Scope Team
+ * 
+ * @File Name
+ *   app.h
+ * 
+ * @Summary
+ *   FPGA Interface and Sample Memory
+*/
 
 #ifndef _APP_H
 #define _APP_H
 
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: Included Files
-// *****************************************************************************
-// *****************************************************************************
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -60,69 +22,55 @@
 #include "configuration.h"
 #include "definitions.h"
 #include "comms.h"
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: Type Definitions
-// *****************************************************************************
-// ***************************************************************************** 
-#define APP_READ_BUFFER_SIZE                                64
+#include "interface.h"
 
 
+#define SAMPLES 11500
 
-// *****************************************************************************
-/* Application States
 
-  Summary:
-    Application states enumeration
+#ifdef	__cplusplus
+extern "C"
+{
+#endif
 
-  Description:
-    This enumeration defines the valid application states.  These states
-    determine the behavior of the application at various times.
-*/
 
 typedef enum
 {
-    // Application's state machine's initial state.
-    APP_STATE_INIT=0,
+	// Application's state machine's initial state.
+	APP_STATE_INIT=0,
 	
-    // Application waits for device configuration
-    APP_STATE_WAIT_FOR_CONFIGURATION,
+	// Application waits for device configuration
+	APP_STATE_WAIT_FOR_CONFIGURATION,
 	
-    // Request ADC sample from FPGA
-    APP_STATE_GET_SAMPLE,
+	// Request ADC sample from FPGA
+	APP_STATE_GET_SAMPLE,
 	
-    // Read ADC sample from FPGA
-    APP_STATE_WAIT_SAMPLE,
+	// Read ADC sample from FPGA
+	APP_STATE_WAIT_SAMPLE,
 	
-    // Send ADC sample over USB
-    APP_STATE_SEND_SAMPLE,
-			
+	// Send ADC sample over USB
+	APP_STATE_SEND_SAMPLE,
+	
 	// Wait for USB to send
 	APP_STATE_WAIT_USB,
 	
-    // Application Error state
-    APP_STATE_ERROR
-} APP_STATES;
+	// Application Error state
+	APP_STATE_ERROR
+} app_states_t;
 
-
-// *****************************************************************************
-/* Application Data
-
-  Summary:
-    Holds application data
-
-  Description:
-    This structure holds the application's data.
-
-  Remarks:
-    Application strings and buffers are be defined outside this structure.
- */
 
 typedef struct
 {
-    /* Application's current state*/
-    APP_STATES state;
+	uint8_t * first;
+	uint8_t * last;
+	uint8_t * end;
+	uint8_t data[SAMPLES];
+} rudimentary_buffer_t;
+
+
+typedef struct
+{
+	app_states_t state;
 	
 	cdc_comms_t comms;
 	
@@ -130,22 +78,14 @@ typedef struct
 	bool comms_tick;
 	
 	int8_t last_sample;
-} APP_DATA;
+	
+	SYS_TIME_HANDLE usb_timeout;
+	
+	rudimentary_buffer_t buf;
+	
+	bool stop_acq;
+} app_data_t;
 
-// *****************************************************************************
-// *****************************************************************************
-// Section: Application Callback Routines
-// *****************************************************************************
-// *****************************************************************************
-/* These routines are called by drivers when certain events occur.
-*/
-
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: Application Initialization and State Machine Functions
-// *****************************************************************************
-// *****************************************************************************
 
 /*******************************************************************************
   Function:
@@ -177,7 +117,6 @@ typedef struct
   Remarks:
     This routine must be called from the SYS_Initialize function.
 */
-
 void APP_Initialize ( void );
 
 
@@ -186,10 +125,10 @@ void APP_Initialize ( void );
     void APP_Tasks ( void )
 
   Summary:
-    MPLAB Harmony Demo application tasks function
+    MPLAB Harmony application tasks function
 
   Description:
-    This routine is the Harmony Demo application's tasks function.  It
+    This routine is the Harmony application's tasks function.  It
     defines the application's state machine and core logic.
 
   Precondition:
@@ -214,7 +153,12 @@ void APP_Initialize ( void );
 void APP_Tasks ( void );
 
 
+extern cdc_comms_t * gp_comms;
+
+
+
+#ifdef	__cplusplus
+}
+#endif
+
 #endif /* _APP_H */
-/*******************************************************************************
- End of File
- */

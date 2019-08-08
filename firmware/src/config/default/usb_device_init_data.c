@@ -97,7 +97,7 @@ const USB_DEVICE_DESCRIPTOR deviceDescriptor =
 
     USB_DEVICE_EP0_BUFFER_SIZE,                             // Max packet size for EP0, see configuration.h
     0x04D8,                                                 // Vendor ID
-    0x000A,                                                 // Product ID				
+    0xED08,                                                 // Product ID				
     0x0100,                                                 // Device release number in BCD format
     0x01,                                                   // Manufacturer string index
     0x02,                                                   // Product string index
@@ -360,13 +360,13 @@ USB_DEVICE_CONFIGURATION_DESCRIPTORS_TABLE fullSpeedConfigDescSet[1] =
     {
         uint8_t bLength;                                    // Size of this descriptor in bytes
         uint8_t bDscType;                                   // STRING descriptor type
-        uint16_t string[25];                                // String
+        uint16_t string[16];                                // String
     }
     sd001 =
     {
         sizeof(sd001),
         USB_DESCRIPTOR_STRING,
-        {'M','i','c','r','o','c','h','i','p',' ','T','e','c','h','n','o','l','o','g','y',' ','I','n','c','.'}
+        {'P','r','o','b','e','-','S','c','o','p','e',' ','T','e','a','m'}
 		
     };
 
@@ -377,13 +377,13 @@ USB_DEVICE_CONFIGURATION_DESCRIPTORS_TABLE fullSpeedConfigDescSet[1] =
     {
         uint8_t bLength;                                    // Size of this descriptor in bytes
         uint8_t bDscType;                                   // STRING descriptor type
-        uint16_t string[22];                                // String
+        uint16_t string[11];                                // String
     }
     sd002 =
     {
         sizeof(sd002),
         USB_DESCRIPTOR_STRING,
-		{'S','i','m','p','l','e',' ','C','D','C',' ','D','e','v','i','c','e',' ','D','e','m','o'}
+		{'P','r','o','b','e','-','S','c','o','p','e'}
     }; 
 /***************************************
  * Array of string descriptors

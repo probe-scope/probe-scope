@@ -12,6 +12,17 @@
 */
 
 #include "comms.h"
+#include "interface.h"
+#include "usb/src/usb_device_cdc_local.h"
+#include "usb/usb_device_cdc.h"
+
+#include <stdlib.h>
+#include <stddef.h>
+#include <string.h>
+
+
+static uint8_t __attribute__((coherent, aligned(16))) read_buffer[CDC_READ_BUFFER_SIZE];
+
 
 /*******************************************************
  * USB CDC Device Events - Application Event Handler
@@ -107,9 +118,7 @@ static USB_DEVICE_CDC_EVENT_RESPONSE COMMS_USBDeviceCDCEventHandler
 
         case USB_DEVICE_CDC_EVENT_WRITE_COMPLETE:
 
-            /* This means that the data write got completed. We can schedule
-             * the next read. */
-
+            cdc_comms->writeTransferHandle = USB_DEVICE_CDC_TRANSFER_HANDLE_INVALID;
             cdc_comms->transmitState = RXTX_IDLE;
             break;
 
@@ -194,8 +203,9 @@ static void COMMS_USBDeviceEventHandler
             
             break;
 
-        case USB_DEVICE_EVENT_RESUMED:
         case USB_DEVICE_EVENT_ERROR:
+            LED2_Clear();
+        case USB_DEVICE_EVENT_RESUMED:
         default:
             
             break;
@@ -213,8 +223,8 @@ static bool comms_state_reset(cdc_comms_t * cdc_comms)
         cdc_comms->state = CC_STATE_WAIT_FOR_CONFIGURATION;
         cdc_comms->readTransferHandle = USB_DEVICE_CDC_TRANSFER_HANDLE_INVALID;
         cdc_comms->writeTransferHandle = USB_DEVICE_CDC_TRANSFER_HANDLE_INVALID;
-        cdc_comms->transmitState = RXTX_IDLE;
-        cdc_comms->receiveState = RXTX_IDLE;
+        cdc_comms->transmitState = RXTX_READY;
+        cdc_comms->receiveState = RXTX_READY;
         retVal = true;
     }
     else
@@ -227,11 +237,7 @@ static bool comms_state_reset(cdc_comms_t * cdc_comms)
 
 void comms_init (
 	cdc_comms_t *    cdc_comms,
-	SYS_MODULE_INDEX deviceIndex,
-	uint8_t *        readBuffer,
-	uint32_t         readBufferSize,
-	uint8_t *        writeBuffer,
-	uint32_t         writeBufferSize
+	SYS_MODULE_INDEX deviceIndex
 )
 {
     // Place the comms state machine in its initial state.
@@ -258,8 +264,8 @@ void comms_init (
     // Initialize internal states
     cdc_comms->transmitState = RXTX_IDLE;
     cdc_comms->receiveState = RXTX_IDLE;
-	cdc_comms->transmitBytes = 0;
 	cdc_comms->receiveBytes = 0;
+	cdc_comms->receiveBytesTotal = 0;
 	
     // Reset other flags
     cdc_comms->sofEventHasOccurred = false;
@@ -268,19 +274,20 @@ void comms_init (
 	cdc_comms->deviceIndex = deviceIndex;
 	
     // Set up the read buffer
-    cdc_comms->cdcReadBuffer = readBuffer;
-	cdc_comms->cdcReadBufferSize = readBufferSize;
+    cdc_comms->cdcReadBuffer = (uint8_t *)malloc(CDC_READ_BUFFER_SIZE);
+	cdc_comms->cdcReadBufferSize = CDC_READ_BUFFER_SIZE;
 	
-    // Set up the read buffer
-    cdc_comms->cdcWriteBuffer = writeBuffer;
-	cdc_comms->cdcWriteBufferSize = writeBufferSize;
+	cdc_comms->rx_auto = false;
+	cdc_comms->rx_auto_fail = false;
+	cdc_comms->rx_auto_terminator = '\0';
+	cdc_comms->rx_target_bytes = 0;
+	cdc_comms->rx_out = NULL;
 }
 
 void comms_task (cdc_comms_t * cdc_comms)
 {
     /* Update the comms state machine based
      * on the current state */
-    //int i;
     
     switch(cdc_comms->state)
     {
@@ -303,133 +310,152 @@ void comms_task (cdc_comms_t * cdc_comms)
 
             break;
 
-        case CC_STATE_WAIT_FOR_CONFIGURATION:
-
-            /* Check if the device was configured */
-            if(cdc_comms->isConfigured)
-            {
-                /* If the device is configured then lets start reading */
-                cdc_comms->state = CC_STATE_TRANSACT;
-            }
-            
-            break;
+		case CC_STATE_WAIT_FOR_CONFIGURATION:
+			
+			/* Check if the device was configured */
+			if(cdc_comms->isConfigured)
+			{
+				cdc_comms->cdcReadBufferSize = CDC_READ_BUFFER_SIZE;
+				cdc_comms->cdcReadBuffer = read_buffer;
+				
+				if (NULL != cdc_comms->cdcReadBuffer)
+				{
+					cdc_comms->transmitState = RXTX_READY;
+					cdc_comms->receiveState = RXTX_READY;
+					cdc_comms->state = CC_STATE_TRANSACT;
+				}
+				else
+				{
+					cdc_comms->state = CC_STATE_ERROR;
+				}
+			}
+			
+			break;
 		
 		case CC_STATE_TRANSACT:
-			comms_state_reset(cdc_comms);
-			
-			switch (cdc_comms->transmitState)
+			if (comms_state_reset(cdc_comms))
 			{
-				case RXTX_READY:
-					cdc_comms->writeTransferHandle = USB_DEVICE_CDC_TRANSFER_HANDLE_INVALID;
-					cdc_comms->transmitState = RXTX_BUSY;
+				break; // USB got reset
+			}
+			
+			if (RXTX_IDLE == cdc_comms->transmitState)
+			{
+				cdc_comms->transmitState = RXTX_READY;
+			}
+			
+			if (cdc_comms->writeTransferHandle == USB_DEVICE_CDC_TRANSFER_HANDLE_INVALID)
+			{
+				cdc_comms->transmitState = RXTX_READY;
+			}
+			
+			if (RXTX_IDLE == cdc_comms->receiveState
+				&& cdc_comms->receiveBytes > 0)
+			{
+				if (cdc_comms->rx_auto)
+				{
+					// If an overrun would happen, reduce apparent bytes read
+					cdc_comms->receiveBytesTotal += cdc_comms->receiveBytes;
+					if (cdc_comms->receiveBytesTotal > cdc_comms->rx_target_bytes)
+					{
+						uint32_t diff = cdc_comms->receiveBytesTotal
+							- cdc_comms->rx_target_bytes;
+						cdc_comms->receiveBytesTotal -= diff;
+						cdc_comms->receiveBytes -= diff;
+					}
 					
-					USB_DEVICE_CDC_Write(cdc_comms->deviceIndex,
-							&(cdc_comms->writeTransferHandle),
-							cdc_comms->cdcWriteBuffer, cdc_comms->transmitBytes,
-							USB_DEVICE_CDC_TRANSFER_FLAGS_DATA_COMPLETE);
-					break;
-				
-				// Other state transfers are accomplished elsewhere
-				case RXTX_BUSY:
-				case RXTX_IDLE:
-				default:
-					break;
+					// Try to detect auto terminator character
+					uint32_t i;
+					for (i = 0;	i < cdc_comms->receiveBytes; i++)
+					{
+						uint8_t last_char = '\0';
+						if (i)
+						{
+							last_char = cdc_comms->cdcReadBuffer[i - 1];
+						}
+						else if (cdc_comms->receiveBytesTotal
+							> cdc_comms->receiveBytes)
+						{
+							last_char = cdc_comms->rx_out[
+								cdc_comms->receiveBytesTotal
+								- cdc_comms->receiveBytes - 1];
+						}
+						
+						if (cdc_comms->cdcReadBuffer[i]
+								== cdc_comms->rx_auto_terminator
+								&& IF_ESCAPE != last_char)
+						{
+							// Found it so we're done
+							cdc_comms->rx_auto = false;
+							cdc_comms->receiveState = RXTX_READY;
+							
+							// If it's not the last character, make it so
+							uint32_t diff = (cdc_comms->receiveBytes - i) - 1;
+							cdc_comms->receiveBytesTotal -= diff;
+							cdc_comms->receiveBytes -= diff;
+							break;
+						}
+					}
+					
+					// Go ahead and copy received data to output buffer
+					memcpy(&(cdc_comms->rx_out[cdc_comms->receiveBytesTotal
+						- cdc_comms->receiveBytes]), cdc_comms->cdcReadBuffer,
+						cdc_comms->receiveBytes);
+					
+					// If we're not done, schedule another read
+					if (RXTX_IDLE == cdc_comms->receiveState)
+					{
+						if (cdc_comms->receiveBytesTotal
+							< cdc_comms->rx_target_bytes)
+						{
+							USB_DEVICE_CDC_Read (cdc_comms->deviceIndex,
+								&(cdc_comms->readTransferHandle),
+								cdc_comms->cdcReadBuffer,
+								cdc_comms->cdcReadBufferSize);
+							cdc_comms->receiveState = RXTX_BUSY;
+						}
+						else
+						{
+							// We're at the byte limit so just call it off
+							cdc_comms->rx_auto = false;
+							cdc_comms->rx_auto_fail = true;
+							cdc_comms->receiveState = RXTX_READY;
+						}
+					}
+				}
+				else
+				{
+					// If an overrun would happen, reduce apparent bytes read
+					cdc_comms->receiveBytesTotal += cdc_comms->receiveBytes;
+					if (cdc_comms->receiveBytesTotal > cdc_comms->rx_target_bytes)
+					{
+						uint32_t diff = cdc_comms->receiveBytesTotal
+								- cdc_comms->rx_target_bytes;
+						cdc_comms->receiveBytesTotal -= diff;
+						cdc_comms->receiveBytes -= diff;
+					}
+					
+					// Go ahead and copy received data to output buffer
+					memcpy(&(cdc_comms->rx_out[cdc_comms->receiveBytesTotal
+						- cdc_comms->receiveBytes]), cdc_comms->cdcReadBuffer,
+						cdc_comms->receiveBytes);
+					
+					// If we're not done, schedule another read
+					if (cdc_comms->receiveBytes >= cdc_comms->rx_target_bytes)
+					{
+						cdc_comms->receiveState = RXTX_READY;
+					}
+					else if (cdc_comms->receiveBytes
+							< cdc_comms->cdcReadBufferSize)
+					{
+						USB_DEVICE_CDC_Read (cdc_comms->deviceIndex,
+							&(cdc_comms->readTransferHandle),
+							cdc_comms->cdcReadBuffer,
+							cdc_comms->cdcReadBufferSize);
+						cdc_comms->receiveState = RXTX_BUSY;
+					}
+				}
 			}
 			break;
-
-		/*
-        case CC_STATE_SCHEDULE_READ:
-
-            if(comms_state_reset(cdc_comms))
-            {
-                break;
-            }
-
-            // If a read is complete, then schedule a read
-            // else wait for the current read to complete
-
-            cdc_comms->state = CC_STATE_WAIT_FOR_READ_COMPLETE;
-            if(cdc_comms->isReadComplete == true)
-            {
-                cdc_comms->isReadComplete = false;
-                cdc_comms->readTransferHandle =  USB_DEVICE_CDC_TRANSFER_HANDLE_INVALID;
-
-                USB_DEVICE_CDC_Read (cdc_comms->deviceIndex,
-                        &(cdc_comms->readTransferHandle), cdc_comms->cdcReadBuffer,
-                        cdc_comms->cdcReadBufferSize);
-                
-                if(cdc_comms->readTransferHandle == USB_DEVICE_CDC_TRANSFER_HANDLE_INVALID)
-                {
-                    cdc_comms->state = CC_STATE_ERROR;
-                    break;
-                }
-            }
-
-            break;
-
-        case CC_STATE_WAIT_FOR_READ_COMPLETE:
-
-            if(comms_state_reset(cdc_comms))
-            {
-                break;
-            }
-
-            // Check if a character was received the isReadComplete flag gets 
-            // updated in the CDC event handler.
-
-            if(cdc_comms->isReadComplete)
-            {
-                cdc_comms->state = CC_STATE_SCHEDULE_WRITE;
-            }
-
-            break;
-
-
-        case CC_STATE_SCHEDULE_WRITE:
-
-            if(comms_state_reset(cdc_comms))
-            {
-                break;
-            }
-
-            // Setup the write
-
-            cdc_comms->writeTransferHandle = USB_DEVICE_CDC_TRANSFER_HANDLE_INVALID;
-            cdc_comms->isWriteComplete = false;
-            cdc_comms->state = CC_STATE_WAIT_FOR_WRITE_COMPLETE;
-
-            // Else echo each received character by adding 1
-            for(i = 0; i < cdc_comms->numBytesRead; i++)
-            {
-                if((cdc_comms->cdcReadBuffer[i] != 0x0A) && (cdc_comms->cdcReadBuffer[i] != 0x0D))
-                {
-                    cdc_comms->cdcWriteBuffer[i] = cdc_comms->cdcReadBuffer[i] + 1;
-                }
-            }
-            USB_DEVICE_CDC_Write(cdc_comms->deviceIndex,
-                    &(cdc_comms->writeTransferHandle),
-                    cdc_comms->cdcWriteBuffer, cdc_comms->numBytesRead,
-                    USB_DEVICE_CDC_TRANSFER_FLAGS_DATA_COMPLETE);
-
-            break;
-
-        case CC_STATE_WAIT_FOR_WRITE_COMPLETE:
-
-            if(comms_state_reset(cdc_comms))
-            {
-                break;
-            }
-
-            // Check if a character was sent. The isWriteComplete
-            // flag gets updated in the CDC event handler
-
-            if(cdc_comms->isWriteComplete == true)
-            {
-                cdc_comms->state = CC_STATE_SCHEDULE_READ;
-            }
-
-            break;
-		*/
 
         case CC_STATE_ERROR:
         default:
@@ -438,14 +464,89 @@ void comms_task (cdc_comms_t * cdc_comms)
     }
 }
 
-bool comms_transmit (cdc_comms_t * cdc_comms, uint32_t bytes)
+bool comms_transmit (cdc_comms_t * cdc_comms, uint8_t * buffer, uint32_t bytes)
 {
-	if (RXTX_IDLE != cdc_comms->transmitState)
+	if (RXTX_READY != cdc_comms->transmitState)
 	{
 		return false;
 	}
 	
-	cdc_comms->transmitBytes = bytes;
-	cdc_comms->transmitState = RXTX_READY;
+	cdc_comms->writeTransferHandle = USB_DEVICE_CDC_TRANSFER_HANDLE_INVALID;
+	
+	if (USB_DEVICE_CDC_RESULT_OK == USB_DEVICE_CDC_Write(cdc_comms->deviceIndex,
+		&(cdc_comms->writeTransferHandle), buffer,
+		bytes, USB_DEVICE_CDC_TRANSFER_FLAGS_DATA_COMPLETE))
+	{
+		if (cdc_comms->writeTransferHandle != USB_DEVICE_CDC_TRANSFER_HANDLE_INVALID)
+		{
+			// USB can go so fast it finished before we even get here, so the
+			// handler advances state too early and then the state gets stuck
+			cdc_comms->transmitState = RXTX_BUSY;
+		}
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+bool
+comms_receive (cdc_comms_t * cdc_comms, uint8_t * buffer, uint32_t bytes)
+{
+	if (RXTX_READY != cdc_comms->receiveState)
+	{
+		return false;
+	}
+	
+	cdc_comms->rx_auto = false;
+	cdc_comms->rx_target_bytes = bytes;
+	cdc_comms->rx_out = buffer;
+	cdc_comms->receiveBytesTotal = 0;
+	cdc_comms->readTransferHandle = USB_DEVICE_CDC_TRANSFER_HANDLE_INVALID;
+	
+	if (USB_DEVICE_CDC_RESULT_OK == USB_DEVICE_CDC_Read (cdc_comms->deviceIndex,
+		&(cdc_comms->readTransferHandle), cdc_comms->cdcReadBuffer,
+		cdc_comms->cdcReadBufferSize))
+	{
+		cdc_comms->receiveState = RXTX_BUSY;
+		return true;
+	}
+	else
+	{
+		return false;
+	}
 	return true;
 }
+
+bool
+comms_receive_auto (cdc_comms_t * cdc_comms, uint8_t * buffer,
+					uint32_t bytes, uint8_t terminator)
+{
+	if (RXTX_READY != cdc_comms->receiveState)
+	{
+		return false;
+	}
+	
+	cdc_comms->rx_auto = true;
+	cdc_comms->rx_target_bytes = bytes;
+	cdc_comms->rx_auto_terminator = terminator;
+	cdc_comms->rx_out = buffer;
+	cdc_comms->receiveBytesTotal = 0;
+	cdc_comms->readTransferHandle = USB_DEVICE_CDC_TRANSFER_HANDLE_INVALID;
+	
+	if (USB_DEVICE_CDC_RESULT_OK == USB_DEVICE_CDC_Read (cdc_comms->deviceIndex,
+		&(cdc_comms->readTransferHandle), cdc_comms->cdcReadBuffer,
+		cdc_comms->cdcReadBufferSize))
+	{
+		cdc_comms->receiveState = RXTX_BUSY;
+		return true;
+	}
+	else
+	{
+		cdc_comms->rx_auto = false;
+		return false;
+	}
+	return true;
+}
+

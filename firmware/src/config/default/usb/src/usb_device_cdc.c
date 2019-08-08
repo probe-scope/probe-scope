@@ -818,7 +818,7 @@ USB_DEVICE_CDC_RESULT USB_DEVICE_CDC_Read
     }
 
     thisCDCDevice = &gUSBDeviceCDCInstance[iCDC];
-    endpoint = &thisCDCDevice->dataInterface.endpoint[USB_DEVICE_CDC_ENDPOINT_RX];
+    endpoint = &(thisCDCDevice->dataInterface.endpoint[USB_DEVICE_CDC_ENDPOINT_RX]);
     *transferHandle = USB_DEVICE_CDC_TRANSFER_HANDLE_INVALID;
 
     /* Check if the endpoint is configured */
