@@ -40,6 +40,7 @@
 #define IF_VM_DAC_LENGTH  (IF_VM_DAC_END - IF_VM_DAC_START + 1)
 
 #define SAMPLE_DATA_LENGTH_FI 'L'
+#define SAMPLE_DATA_FI        'D'
 #define WRITE_ADDRESS_FI      'A'
 #define WRITE_LENGTH_FI       'L'
 #define WRITE_DATA_FI         'D'
@@ -62,8 +63,8 @@ typedef enum
 {
 	IF_STATE_INIT = 0,
 	IF_STATE_WAIT,
-	IF_STATE_PROCESS_HOST_COMMAND,
-	IF_STATE_GENERATE_HW_COMMAND
+	IF_STATE_PROCESS_HOST_MSG,
+	IF_STATE_SEND_HW_MSG
 } if_states_t;
 
 typedef enum
@@ -97,14 +98,14 @@ typedef enum
 } if_commands_t;
 
 
-typedef struct
+typedef struct __attribute__((__packed__))
 {
 	char     sample_data_length_fi;
 	uint32_t sample_data_length;
 	char     sample_data_fi;
 } if_res_data_req_samp_data_t;
 
-typedef struct
+typedef struct __attribute__((__packed__))
 {
 	char     write_address_fi;
 	uint32_t write_address;
@@ -113,13 +114,13 @@ typedef struct
 	char     write_data_fi;
 } if_cmd_data_write_regs_t;
 
-typedef struct
+typedef struct __attribute__((__packed__))
 {
 	char     write_length_fi;
 	uint32_t write_length;
 } if_res_data_write_regs_t;
 
-typedef struct
+typedef struct __attribute__((__packed__))
 {
 	char     read_address_fi;
 	uint32_t read_address;
@@ -127,7 +128,7 @@ typedef struct
 	uint32_t read_length;
 } if_cmd_data_read_regs_t;
 
-typedef struct
+typedef struct __attribute__((__packed__))
 {
 	char     read_length_fi;
 	uint32_t read_length;
@@ -167,6 +168,8 @@ typedef struct
 	
 	if_message_t    tx_msg;
 	if_message_t    rx_msg;
+	
+	bool            wait_trigger;
 } if_data_t;
 
 

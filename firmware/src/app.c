@@ -49,14 +49,6 @@ APP_ISR_Tick (uintptr_t context)
 	appData->comms_tick = true;
 }
 
-static void
-APP_ISR_UnfuckUSB (uintptr_t context)
-{
-	app_data_t * appData = (app_data_t *) context;
-	
-	appData->comms.transmitState = RXTX_READY;
-}
-
 
 /// Main Functions
 
@@ -89,6 +81,7 @@ void APP_Initialize(void)
 	FPP_DRDY_InputEnable();
 	FPP_DREQ_OutputEnable();
 	FPP_DREQ_Clear();
+	FPIO0_InputEnable(); // trigger
 }
 
 void APP_Tasks(void)
@@ -101,12 +94,8 @@ void APP_Tasks(void)
 			SYS_TIME_CallbackRegisterMS(APP_ISR_Blink, (uintptr_t) &appData, 500, SYS_TIME_PERIODIC);
 			SYS_TIME_CallbackRegisterMS(APP_ISR_Tick, (uintptr_t) &appData, 1, SYS_TIME_PERIODIC);
 			
-			appData.usb_timeout = SYS_TIME_TimerCreate(0,
-					SYS_TIME_MSToCount(200), APP_ISR_UnfuckUSB,
-					(uintptr_t) &appData, SYS_TIME_PERIODIC);
-			//SYS_TIME_TimerStart(appData.usb_timeout);
-			
 			appData.state = APP_STATE_WAIT_FOR_CONFIGURATION;
+			appData.triggered = false;
 			
             break;
 		
@@ -115,11 +104,20 @@ void APP_Tasks(void)
             // Check if the device was configured
             if(appData.comms.isConfigured)
             {
-                // If the device is configured then lets start samplin'
-                appData.state = APP_STATE_GET_SAMPLE;
+                appData.state = APP_STATE_WAIT_TRIGGER;
             }
             
             break;
+		
+		case APP_STATE_WAIT_TRIGGER:
+			if (FPIO0_Get())
+			{
+				LED1_Set();
+				appData.buf.first = appData.buf.data;
+				appData.buf.last = appData.buf.data;
+				appData.state = APP_STATE_GET_SAMPLE;
+			}
+			break;
 		
 		case APP_STATE_GET_SAMPLE:
 			if (!appData.stop_acq)
@@ -145,46 +143,19 @@ void APP_Tasks(void)
 				
 				FPP_DREQ_Clear();
 				
+				appData.state = APP_STATE_GET_SAMPLE;
+				
+				*(appData.buf.last) = inter;
 				appData.buf.last++;
 				if (appData.buf.last >= appData.buf.end)
 				{
-					appData.buf.last = appData.buf.data;
-				}
-				if (appData.buf.first == appData.buf.last)
-				{
-					appData.buf.first++;
-					if (appData.buf.first >= appData.buf.end)
-					{
-						appData.buf.first = appData.buf.data;
-					}
-				}
-				*(appData.buf.last) = inter;
-				
-				appData.state = APP_STATE_GET_SAMPLE;
-			}
-			break;
-		
-		case APP_STATE_SEND_SAMPLE:
-			if (RXTX_READY == appData.comms.transmitState && appData.comms_tick)
-			{
-				uint32_t bytes = sprintf((char *) text_buffer, "%d\r\n", appData.last_sample);
-				if(comms_transmit(&(appData.comms), text_buffer, bytes))
-				{
-					appData.state = APP_STATE_WAIT_USB;
-					appData.comms_tick = false;
+					appData.buf.last = appData.buf.end;
+					appData.state = APP_STATE_TRIGGERED;
 				}
 			}
 			break;
 		
-		case APP_STATE_WAIT_USB:
-			if (RXTX_READY == appData.comms.transmitState)
-			{
-				SYS_TIME_TimerStop(appData.usb_timeout);
-				SYS_TIME_TimerStart(appData.usb_timeout);
-				appData.state = APP_STATE_GET_SAMPLE;
-			}
-			break;
-		
+		case APP_STATE_TRIGGERED:
         case APP_STATE_ERROR:
         default:
             

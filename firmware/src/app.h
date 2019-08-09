@@ -41,6 +41,9 @@ typedef enum
 	
 	// Application waits for device configuration
 	APP_STATE_WAIT_FOR_CONFIGURATION,
+			
+	// Wait for trigger from FPGA
+	APP_STATE_WAIT_TRIGGER,
 	
 	// Request ADC sample from FPGA
 	APP_STATE_GET_SAMPLE,
@@ -48,11 +51,8 @@ typedef enum
 	// Read ADC sample from FPGA
 	APP_STATE_WAIT_SAMPLE,
 	
-	// Send ADC sample over USB
-	APP_STATE_SEND_SAMPLE,
-	
-	// Wait for USB to send
-	APP_STATE_WAIT_USB,
+	// Trigger gotten, wait for IF module to reset it
+	APP_STATE_TRIGGERED,
 	
 	// Application Error state
 	APP_STATE_ERROR
@@ -84,6 +84,7 @@ typedef struct
 	rudimentary_buffer_t buf;
 	
 	bool stop_acq;
+	bool triggered;
 } app_data_t;
 
 
@@ -154,6 +155,7 @@ void APP_Tasks ( void );
 
 
 extern cdc_comms_t * gp_comms;
+extern app_data_t appData;
 
 
 

@@ -322,6 +322,10 @@ void comms_task (cdc_comms_t * cdc_comms)
 				{
 					cdc_comms->transmitState = RXTX_READY;
 					cdc_comms->receiveState = RXTX_READY;
+					cdc_comms->readTransferHandle =
+						USB_DEVICE_CDC_TRANSFER_HANDLE_INVALID;
+					cdc_comms->writeTransferHandle =
+						USB_DEVICE_CDC_TRANSFER_HANDLE_INVALID;
 					cdc_comms->state = CC_STATE_TRANSACT;
 				}
 				else

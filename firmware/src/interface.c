@@ -69,53 +69,92 @@ if_init (void)
 	*/
 	
 	if_data.state = IF_STATE_INIT;
-	
-	if_data.tx_state = IF_TX_STATE_WAIT;
-	if_data.tx_error_count = 0;
-	if_data.tx_error_flag = false;
-	
-	if_data.rx_state = IF_RX_STATE_WAIT;
-	if_data.rx_error_count = 0;
-	if_data.rx_error_flag = false;
-	
-	memset(&(if_data.rx_msg), 0, sizeof(if_data.rx_msg));
 }
 
 void
 if_task (void)
 {
-	if_rx_task();
-	if_tx_task();
-	
-	if (IF_RX_STATE_MSG_READY == if_data.rx_state
-		&& IF_TX_STATE_WAIT == if_data.tx_state)
+	switch (if_data.state)
 	{
-			LED1_Toggle();
-		switch (if_data.rx_msg.command)
-		{
-			case IF_CMD_REQ_SAMP_DATA:
-				if_send_samp_data();
-				break;
-
-			case IF_CMD_WRITE_REGS:
-				// NYI
-				break;
-
-			case IF_CMD_READ_REGS:
-				// NYI
-				break;
-
-			default:
-				// real bad
-				break;
-		}
+		case IF_STATE_INIT:
+			if_data.tx_state = IF_TX_STATE_WAIT;
+			if_data.tx_error_count = 0;
+			if_data.tx_error_flag = false;
+			
+			if_data.rx_state = IF_RX_STATE_WAIT;
+			if_data.rx_error_count = 0;
+			if_data.rx_error_flag = false;
+			
+			memset(&(if_data.rx_msg), 0, sizeof(if_data.rx_msg));
+			
+			if_data.state = IF_STATE_WAIT;
+			break;
 		
-		if_data.rx_state = IF_RX_STATE_WAIT;
-	}
-	
-	if (IF_TX_STATE_WAIT == if_data.tx_state && !PIC_SW_Get())
-	{
-		if_send_trigger();
+		case IF_STATE_WAIT:
+			if_rx_task();
+
+			if (IF_RX_STATE_MSG_READY == if_data.rx_state)
+			{
+				if_data.state = IF_STATE_PROCESS_HOST_MSG;
+			}
+			
+			if (APP_STATE_TRIGGERED == appData.state)
+			{
+				appData.state = APP_STATE_WAIT_TRIGGER;
+				
+				if (if_data.wait_trigger)
+				{
+					LED1_Clear();
+					if_send_samp_data();
+					if_data.wait_trigger = false;
+				}
+				else
+				{
+					//if_send_trigger();
+				}
+				
+				if_data.state = IF_STATE_SEND_HW_MSG;
+			}
+			break;
+		
+		case IF_STATE_PROCESS_HOST_MSG:
+			switch (if_data.rx_msg.command)
+			{
+				case IF_CMD_REQ_SAMP_DATA:
+					if_data.wait_trigger = true;
+					break;
+				
+				case IF_CMD_WRITE_REGS:
+					// NYI
+					break;
+				
+				case IF_CMD_READ_REGS:
+					// NYI
+					break;
+				
+				default:
+					// real bad
+					break;
+			}
+			
+			if_data.rx_state = IF_RX_STATE_WAIT;
+			if_data.state = IF_STATE_SEND_HW_MSG;
+			break;
+		
+		case IF_STATE_SEND_HW_MSG:
+			if (IF_TX_STATE_WAIT == if_data.tx_state)
+			{
+				if_data.state = IF_STATE_WAIT;
+			}
+			else
+			{
+				if_tx_task();
+			}
+			break;
+		
+		default:
+			if_data.state = IF_STATE_INIT;
+			break;
 	}
 }
 
@@ -247,7 +286,7 @@ if_rx_task (void)
 	{
 		case IF_RX_STATE_WAIT:
 			if (true == comms_receive_auto(gp_comms, in_buffer,
-				MAX_INCOMING_MESSAGE, IF_END_BLOCK))
+				MAX_INCOMING_MESSAGE, IF_END_MESSAGE))
 			{
 				if_data.rx_state = IF_RX_STATE_RECEIVING;
 			}
@@ -406,7 +445,18 @@ if_tx_task (void)
 static void
 if_send_samp_data (void)
 {
+	if_data.tx_msg.type = IF_MSG_RESULT;
+	if_data.tx_msg.command = IF_CMD_REQ_SAMP_DATA;
 	
+	if_data.tx_msg.data.res_data_req_samp_data.sample_data_fi =
+		SAMPLE_DATA_FI;
+	if_data.tx_msg.data.res_data_req_samp_data.sample_data_length_fi =
+		SAMPLE_DATA_LENGTH_FI;
+	if_data.tx_msg.data.res_data_req_samp_data.sample_data_length = SAMPLES;
+	
+	if_data.tx_msg.var_data = appData.buf.data;
+	
+	if_data.tx_state = IF_TX_STATE_ENCODE;
 }
 
 static void
