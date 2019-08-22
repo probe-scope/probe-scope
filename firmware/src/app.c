@@ -82,6 +82,8 @@ void APP_Initialize(void)
 	FPP_DREQ_OutputEnable();
 	FPP_DREQ_Clear();
 	FPIO0_InputEnable(); // trigger
+	FPIO1_OutputEnable(); // pic ready
+	FPIO2_InputEnable(); // fpga ready
 }
 
 void APP_Tasks(void)
@@ -110,11 +112,20 @@ void APP_Tasks(void)
             break;
 		
 		case APP_STATE_WAIT_TRIGGER:
-			if (FPIO0_Get())
+			LED1_Clear();
+			if (FPIO0_Get()) // FPGA trigger out
 			{
 				LED1_Set();
+				FPIO1_Set(); // indicate ready to receive
 				appData.buf.first = appData.buf.data;
 				appData.buf.last = appData.buf.data;
+				appData.state = APP_STATE_WAIT_BUFFER;
+			}
+			break;
+		
+		case APP_STATE_WAIT_BUFFER:
+			if (FPIO2_Get()) // FPGA second half full
+			{
 				appData.state = APP_STATE_GET_SAMPLE;
 			}
 			break;
@@ -122,10 +133,20 @@ void APP_Tasks(void)
 		case APP_STATE_GET_SAMPLE:
 			if (!appData.stop_acq)
 			{
-				FPP_DREQ_Set();
+				if (FPIO2_Get())
+				{
+					FPP_DREQ_Set();
+					LED2_Toggle();
 			
-				appData.state = APP_STATE_WAIT_SAMPLE;
-				// no break to enable immediate check for response
+					appData.state = APP_STATE_WAIT_SAMPLE;
+					// no break to enable immediate check for response
+				}
+				else
+				{
+					appData.state = APP_STATE_TRIGGERED;
+					FPIO1_Clear();
+					break;
+				}
 			}
 		
 		case APP_STATE_WAIT_SAMPLE:
@@ -151,11 +172,14 @@ void APP_Tasks(void)
 				{
 					appData.buf.last = appData.buf.end;
 					appData.state = APP_STATE_TRIGGERED;
+					FPIO1_Clear();
 				}
 			}
 			break;
 		
 		case APP_STATE_TRIGGERED:
+			break;
+		
         case APP_STATE_ERROR:
         default:
             

@@ -153,7 +153,6 @@ static void COMMS_USBDeviceEventHandler
         case USB_DEVICE_EVENT_RESET:
 
             /* Update LED to show reset state */
-            LED2_Clear();
 
             cdc_comms->isConfigured = false;
 
@@ -167,7 +166,6 @@ static void COMMS_USBDeviceEventHandler
             if ( configuredEventData->configurationValue == 1)
             {
                 /* Update LED to show configured state */
-                LED2_Set();
                 
                 /* Register the CDC Device application event handler here.
                  * Note how the appData object pointer is passed as the
@@ -193,18 +191,15 @@ static void COMMS_USBDeviceEventHandler
             /* VBUS is not available any more. Detach the device. */
             USB_DEVICE_Detach(cdc_comms->deviceHandle);
             
-            LED2_Clear();
             
             break;
 
         case USB_DEVICE_EVENT_SUSPENDED:
 
-            LED2_Clear();
             
             break;
 
         case USB_DEVICE_EVENT_ERROR:
-            LED2_Clear();
         case USB_DEVICE_EVENT_RESUMED:
         default:
             
@@ -315,8 +310,19 @@ void comms_task (cdc_comms_t * cdc_comms)
 			/* Check if the device was configured */
 			if(cdc_comms->isConfigured)
 			{
+				// Set up read buffer for whatever the size ends up being - I
+				// cannot for the life of me figure out where this is configured
+				// well apparently you can't get the fucking value at runtime
+				// either so I guess I'll just hope that 0x200 is right usually
+				//cdc_comms->cdcReadBufferSize =
+				//		gUSBDeviceCDCInstance[cdc_comms->deviceIndex]
+				//		->dataInterface.endpoint[USB_DEVICE_CDC_ENDPOINT_RX]
+				//		.maxPacketSize;
 				cdc_comms->cdcReadBufferSize = CDC_READ_BUFFER_SIZE;
+				//cdc_comms->cdcReadBuffer =
+				//		(uint8_t *)malloc(cdc_comms->cdcReadBufferSize);
 				cdc_comms->cdcReadBuffer = read_buffer;
+				// it's all shit
 				
 				if (NULL != cdc_comms->cdcReadBuffer)
 				{
@@ -349,6 +355,7 @@ void comms_task (cdc_comms_t * cdc_comms)
 			
 			if (cdc_comms->writeTransferHandle == USB_DEVICE_CDC_TRANSFER_HANDLE_INVALID)
 			{
+				// sometimes lots of rapid transfers will fuck the driver
 				cdc_comms->transmitState = RXTX_READY;
 			}
 			

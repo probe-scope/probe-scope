@@ -41,9 +41,12 @@ typedef enum
 	
 	// Application waits for device configuration
 	APP_STATE_WAIT_FOR_CONFIGURATION,
-			
+	
 	// Wait for trigger from FPGA
 	APP_STATE_WAIT_TRIGGER,
+	
+	// Wait for FPGA ready signal
+	APP_STATE_WAIT_BUFFER,
 	
 	// Request ADC sample from FPGA
 	APP_STATE_GET_SAMPLE,

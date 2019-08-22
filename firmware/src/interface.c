@@ -30,6 +30,7 @@ static if_data_t if_data;
 static uint8_t __attribute__((coherent, aligned(16))) out_buffer[MAX_OUTGOING_MESSAGE];
 static uint8_t in_buffer[MAX_INCOMING_MESSAGE];
 
+
 static void if_rx_task (void);
 static void if_tx_task (void);
 
@@ -40,35 +41,20 @@ static void if_send_trigger (void);
 void
 if_init (void)
 {
-	/*
-	SYS_MODULE_OBJ objectHandle;
-
-    DRV_I2C_CLIENT_OBJ drvI2C0ClientObjPool[DRV_I2C_CLIENTS_NUMBER_IDX0] = {0};
-
-    DRV_I2C_PLIB_INTERFACE drvI2C0PLibAPI = {
-        .read = (DRV_I2C_PLIB_READ)I2C4_Read,
-        .write = (DRV_I2C_PLIB_WRITE)I2C4_Write,
-        .writeRead = (DRV_I2C_PLIB_WRITE_READ)I2C4_WriteRead,
-        .errorGet = (DRV_I2C_PLIB_ERROR_GET)I2C4_ErrorGet,
-        .callbackRegister = (DRV_I2C_PLIB_CALLBACK_REGISTER)I2C4_CallbackRegister,
-    };
-
-    DRV_I2C_INIT drvI2C0InitData = {
-
-        .i2cPlib = &drvI2C0PLibAPI,
-        .numClients = DRV_I2C_CLIENTS_NUMBER_IDX0,
-        .clientObjPool = (uintptr_t)&drvI2C0ClientObjPool[0],
-        .clockSpeed = DRV_I2C_CLOCK_SPEED_IDX0,
-    };
-
-    objectHandle = DRV_I2C_Initialize(DRV_I2C_INDEX_0, (SYS_MODULE_INIT*)&drvI2C0InitData);
-    if (objectHandle == SYS_MODULE_OBJ_INVALID)
-    {
-        // Handle error
-    }
-	*/
 	
 	if_data.state = IF_STATE_INIT;
+	
+	if_data.tx_state = IF_TX_STATE_WAIT;
+	if_data.tx_error_count = 0;
+	if_data.tx_error_flag = false;
+	
+	if_data.rx_state = IF_RX_STATE_WAIT;
+	if_data.rx_error_count = 0;
+	if_data.rx_error_flag = false;
+	
+	memset(&(if_data.rx_msg), 0, sizeof(if_data.rx_msg));
+	
+	if_data.h_spi = DRV_HANDLE_INVALID;
 }
 
 void
@@ -77,17 +63,38 @@ if_task (void)
 	switch (if_data.state)
 	{
 		case IF_STATE_INIT:
-			if_data.tx_state = IF_TX_STATE_WAIT;
-			if_data.tx_error_count = 0;
-			if_data.tx_error_flag = false;
-			
-			if_data.rx_state = IF_RX_STATE_WAIT;
-			if_data.rx_error_count = 0;
-			if_data.rx_error_flag = false;
-			
-			memset(&(if_data.rx_msg), 0, sizeof(if_data.rx_msg));
-			
 			if_data.state = IF_STATE_WAIT;
+			
+			// init spi
+			if (DRV_HANDLE_INVALID == if_data.h_spi)
+			{
+				if_data.h_spi =
+					DRV_SPI_Open(DRV_SPI_INDEX_0, DRV_IO_INTENT_EXCLUSIVE);
+			}
+			if (DRV_HANDLE_INVALID == if_data.h_spi)
+			{
+				if_data.state = IF_STATE_INIT;
+			}
+			else
+			{
+				// bare minimum configuration for now
+			}
+			
+			// init i2c
+			if (DRV_HANDLE_INVALID == if_data.h_i2c)
+			{
+				if_data.h_i2c =
+					DRV_I2C_Open(DRV_I2C_INDEX_0, DRV_IO_INTENT_EXCLUSIVE);
+			}
+			if (DRV_HANDLE_INVALID == if_data.h_i2c)
+			{
+				if_data.state = IF_STATE_INIT;
+			}
+			else
+			{
+				// bare minimum configuration for now
+			}
+			
 			break;
 		
 		case IF_STATE_WAIT:
@@ -104,7 +111,6 @@ if_task (void)
 				
 				if (if_data.wait_trigger)
 				{
-					LED1_Clear();
 					if_send_samp_data();
 					if_data.wait_trigger = false;
 				}

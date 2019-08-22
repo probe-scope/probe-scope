@@ -170,6 +170,10 @@ typedef struct
 	if_message_t    rx_msg;
 	
 	bool            wait_trigger;
+	
+	// ext if
+	DRV_HANDLE      h_i2c;
+	DRV_HANDLE      h_spi;
 } if_data_t;
 
 
