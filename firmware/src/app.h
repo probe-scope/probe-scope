@@ -25,7 +25,7 @@
 #include "interface.h"
 
 
-#define SAMPLES 11500
+#define SAMPLES 8192
 
 
 #ifdef	__cplusplus

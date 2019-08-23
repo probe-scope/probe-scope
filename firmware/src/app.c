@@ -15,6 +15,15 @@
 #include <stdio.h>
 #include <string.h>
 
+void __delay_us(unsigned long time)
+{
+    unsigned long start, stop;
+    start = __builtin_mfc0(_CP0_COUNT, _CP0_COUNT_SELECT);
+    stop = time * (192 / 2);
+    while ((__builtin_mfc0(_CP0_COUNT, _CP0_COUNT_SELECT) - start) < stop);
+}
+
+
 
 uint8_t CACHE_ALIGN text_buffer[20];
 
