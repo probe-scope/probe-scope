@@ -30,11 +30,11 @@
 #define IF_VM_PIC_END     0x00001007
 #define IF_VM_PIC_LENGTH  (IF_VM_PIC_END - IF_VM_PIC_START + 1)
 #define IF_VM_FPGA_START  0x00002000
-#define IF_VM_FPGA_END    0x00002001
+#define IF_VM_FPGA_END    0x00002002
 #define IF_VM_FPGA_LENGTH (IF_VM_FPGA_END - IF_VM_FPGA_START + 1)
-#define IF_VM_PGA_START   0x00003000
-#define IF_VM_PGA_END     0x00003001
-#define IF_VM_PGA_LENGTH  (IF_VM_PGA_END - IF_VM_PGA_START + 1)
+#define IF_VM_AFE_START   0x00003000
+#define IF_VM_AFE_END     0x00003001
+#define IF_VM_AFE_LENGTH  (IF_VM_AFE_END - IF_VM_AFE_START + 1)
 #define IF_VM_DAC_START   0x00004000
 #define IF_VM_DAC_END     0x00004010
 #define IF_VM_DAC_LENGTH  (IF_VM_DAC_END - IF_VM_DAC_START + 1)
@@ -171,9 +171,19 @@ typedef struct
 	
 	bool            wait_trigger;
 	
-	// ext if
-	DRV_HANDLE      h_i2c;
-	DRV_HANDLE      h_spi;
+	/// ext if
+	DRV_HANDLE      h_i2c_dac;
+	DRV_HANDLE      h_spi_fpga;
+	DRV_HANDLE      h_spi_afe;
+	
+	uint8_t         vm_pic_buf [IF_VM_PIC_LENGTH];
+	uint8_t         vm_dac_buf [IF_VM_DAC_LENGTH];
+	uint8_t         vm_fpga_buf[IF_VM_FPGA_LENGTH];
+	uint8_t         vm_afe_buf [IF_VM_AFE_LENGTH];
+	
+	DRV_I2C_TRANSFER_HANDLE * const ht_i2c_dac;
+	DRV_SPI_TRANSFER_HANDLE * const ht_spi_fpga;
+	DRV_SPI_TRANSFER_HANDLE * const ht_spi_afe;
 } if_data_t;
 
 

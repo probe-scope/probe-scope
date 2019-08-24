@@ -37,6 +37,13 @@ static void if_tx_task (void);
 static void if_send_samp_data (void);
 static void if_send_trigger (void);
 
+static void if_vm_dispatch (void);
+static void if_vm_pic_op   (uint32_t address, uint32_t length);
+static void if_vm_dac_op   (uint32_t address, uint32_t length);
+static void if_vm_fpga_op  (uint32_t address, uint32_t length);
+static void if_vm_afe_op   (uint32_t address, uint32_t length);
+static void if_vm_respstp  (uint32_t length);
+
 
 void
 if_init (void)
@@ -54,7 +61,9 @@ if_init (void)
 	
 	memset(&(if_data.rx_msg), 0, sizeof(if_data.rx_msg));
 	
-	if_data.h_spi = DRV_HANDLE_INVALID;
+	if_data.h_spi_fpga = DRV_HANDLE_INVALID;
+	if_data.h_spi_afe = DRV_HANDLE_INVALID;
+	if_data.h_i2c_dac = DRV_HANDLE_INVALID;
 }
 
 void
@@ -65,13 +74,13 @@ if_task (void)
 		case IF_STATE_INIT:
 			if_data.state = IF_STATE_WAIT;
 			
-			// init spi
-			if (DRV_HANDLE_INVALID == if_data.h_spi)
+			// init fpga spi
+			if (DRV_HANDLE_INVALID == if_data.h_spi_fpga)
 			{
-				if_data.h_spi =
+				if_data.h_spi_fpga =
 					DRV_SPI_Open(DRV_SPI_INDEX_0, DRV_IO_INTENT_EXCLUSIVE);
 			}
-			if (DRV_HANDLE_INVALID == if_data.h_spi)
+			if (DRV_HANDLE_INVALID == if_data.h_spi_fpga)
 			{
 				if_data.state = IF_STATE_INIT;
 			}
@@ -80,13 +89,28 @@ if_task (void)
 				// bare minimum configuration for now
 			}
 			
-			// init i2c
-			if (DRV_HANDLE_INVALID == if_data.h_i2c)
+			// init afe (filter/pga) spi
+			if (DRV_HANDLE_INVALID == if_data.h_spi_afe)
 			{
-				if_data.h_i2c =
+				if_data.h_spi_afe =
+					DRV_SPI_Open(DRV_SPI_INDEX_1, DRV_IO_INTENT_EXCLUSIVE);
+			}
+			if (DRV_HANDLE_INVALID == if_data.h_spi_afe)
+			{
+				if_data.state = IF_STATE_INIT;
+			}
+			else
+			{
+				// bare minimum configuration for now
+			}
+			
+			// init dac i2c
+			if (DRV_HANDLE_INVALID == if_data.h_i2c_dac)
+			{
+				if_data.h_i2c_dac =
 					DRV_I2C_Open(DRV_I2C_INDEX_0, DRV_IO_INTENT_EXCLUSIVE);
 			}
-			if (DRV_HANDLE_INVALID == if_data.h_i2c)
+			if (DRV_HANDLE_INVALID == if_data.h_i2c_dac)
 			{
 				if_data.state = IF_STATE_INIT;
 			}
@@ -131,11 +155,8 @@ if_task (void)
 					break;
 				
 				case IF_CMD_WRITE_REGS:
-					// NYI
-					break;
-				
 				case IF_CMD_READ_REGS:
-					// NYI
+					if_vm_dispatch();
 					break;
 				
 				default:
@@ -317,9 +338,10 @@ if_rx_task (void)
 		case IF_RX_STATE_DECODE:
 			if (in_buffer[0] != IF_START_MESSAGE)
 			{
-					if_data.rx_error_count++;
-					if_data.rx_error_flag = true;
-					if_data.rx_state = IF_RX_STATE_WAIT;
+				if_data.rx_error_count++;
+				if_data.rx_error_flag = true;
+				if_data.rx_state = IF_RX_STATE_WAIT;
+				break;
 			}
 			
 			if_data.rx_msg.type = in_buffer[1];
@@ -471,4 +493,162 @@ if_send_trigger (void)
 	if_data.tx_msg.type = IF_MSG_COMMAND;
 	if_data.tx_msg.command = IF_CMD_TRIGGERED;
 	if_data.tx_state = IF_TX_STATE_ENCODE;
+}
+
+
+static void
+if_vm_dispatch (void)
+{
+	// Dispatch a read or write register command to the correct driver
+	
+	uint32_t address, length;
+	
+	if (IF_CMD_WRITE_REGS == if_data.rx_msg.command)
+	{
+		address = if_data.rx_msg.data.cmd_data_write_regs.write_address;
+		length  = if_data.rx_msg.data.cmd_data_write_regs.write_length;
+	}
+	else if (IF_CMD_READ_REGS == if_data.rx_msg.command)
+	{
+		address = if_data.rx_msg.data.cmd_data_read_regs.read_address;
+		length  = if_data.rx_msg.data.cmd_data_read_regs.read_length;
+	}
+	else
+	{
+		// Someone called this at the wrong time, do nothing
+		return;
+	}
+	
+	if ((IF_VM_PIC_START <= address)
+		&& (IF_VM_PIC_END >= (address + length - 1)))
+	{
+		if_vm_pic_op(address - IF_VM_PIC_START, length);
+	}
+	else if ((IF_VM_FPGA_START <= address)
+		&& (IF_VM_FPGA_END >= (address + length - 1)))
+	{
+		if_vm_fpga_op(address - IF_VM_FPGA_START, length);
+	}
+	else if ((IF_VM_AFE_START <= address)
+		&& (IF_VM_AFE_END >= (address + length - 1)))
+	{
+		if_vm_afe_op(address - IF_VM_AFE_START, length);
+	}
+	else if ((IF_VM_DAC_START <= address)
+		&& (IF_VM_DAC_END >= (address + length - 1)))
+	{
+		if_vm_dac_op(address - IF_VM_DAC_START, length);
+	}
+	else
+	{
+		// Invalid address and/or length
+		if_vm_respstp(0);
+	}
+}
+
+static void
+if_vm_pic_op (uint32_t address, uint32_t length)
+{
+	// Process read/write command that maps to PIC memory.
+	// This MUST only be called by if_vm_dispatch, as all the parameter
+	// validation is done there.
+	
+	if (IF_CMD_WRITE_REGS == if_data.rx_msg.command)
+	{
+		memcpy(&(if_data.vm_pic_buf[address]), if_data.rx_msg.var_data, length);
+		if_vm_respstp(length);
+	}
+	else if (IF_CMD_READ_REGS == if_data.rx_msg.command)
+	{
+		if_vm_respstp(length);
+		if_data.tx_msg.var_data = &(if_data.vm_pic_buf[address]);
+	}
+}
+
+static void
+if_vm_dac_op (uint32_t address, uint32_t length)
+{
+	// Process read/write command that maps to DAC memory.
+	// This MUST only be called by if_vm_dispatch, as all the parameter
+	// validation is done there.
+	
+	if (IF_CMD_WRITE_REGS == if_data.rx_msg.command)
+	{
+		memcpy(&(if_data.vm_dac_buf[address]), if_data.rx_msg.var_data, length);
+		if_vm_respstp(length);
+	}
+	else if (IF_CMD_READ_REGS == if_data.rx_msg.command)
+	{
+		if_vm_respstp(length);
+		if_data.tx_msg.var_data = &(if_data.vm_dac_buf[address]);
+	}
+}
+
+static void
+if_vm_fpga_op (uint32_t address, uint32_t length)
+{
+	// Process read/write command that maps to FPGA memory.
+	// This MUST only be called by if_vm_dispatch, as all the parameter
+	// validation is done there.
+	
+	if (IF_CMD_WRITE_REGS == if_data.rx_msg.command)
+	{
+		memcpy(&(if_data.vm_fpga_buf[address]), if_data.rx_msg.var_data,
+			length);
+		if_vm_respstp(length);
+	}
+	else if (IF_CMD_READ_REGS == if_data.rx_msg.command)
+	{
+		if_vm_respstp(length);
+		if_data.tx_msg.var_data = &(if_data.vm_fpga_buf[address]);
+	}
+}
+
+static void
+if_vm_afe_op (uint32_t address, uint32_t length)
+{
+	// Process read/write command that maps to AFE memory.
+	// This MUST only be called by if_vm_dispatch, as all the parameter
+	// validation is done there.
+	
+	if (IF_CMD_WRITE_REGS == if_data.rx_msg.command)
+	{
+		memcpy(&(if_data.vm_afe_buf[address]), if_data.rx_msg.var_data, length);
+		if_vm_respstp(length);
+	}
+	else if (IF_CMD_READ_REGS == if_data.rx_msg.command)
+	{
+		if_vm_respstp(length);
+		if_data.tx_msg.var_data = &(if_data.vm_afe_buf[address]);
+	}
+}
+
+static void
+if_vm_respstp (uint32_t length)
+{
+	// Set up the appropriate response for a read or write command
+	// For write, the user still needs to set the var_data pointer
+	
+	if (IF_CMD_WRITE_REGS == if_data.rx_msg.command)
+	{
+		if_data.tx_msg.type = IF_MSG_RESULT;
+		if_data.tx_msg.command = IF_CMD_WRITE_REGS;
+		if_data.tx_msg.data.res_data_write_regs.write_length_fi =
+			WRITE_LENGTH_FI;
+		if_data.tx_msg.data.res_data_write_regs.write_length = length;
+		
+		if_data.tx_state = IF_TX_STATE_ENCODE;
+	}
+	else if (IF_CMD_READ_REGS == if_data.rx_msg.command)
+	{
+		if_data.tx_msg.type = IF_MSG_RESULT;
+		if_data.tx_msg.command = IF_CMD_READ_REGS;
+		if_data.tx_msg.data.res_data_read_regs.read_length_fi =
+			READ_LENGTH_FI;
+		if_data.tx_msg.data.res_data_read_regs.read_data_fi =
+			READ_DATA_FI;
+		if_data.tx_msg.data.res_data_read_regs.read_length = length;
+		
+		if_data.tx_state = IF_TX_STATE_ENCODE;
+	}
 }
