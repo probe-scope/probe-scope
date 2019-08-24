@@ -14,6 +14,8 @@
 #include "interface.h"
 
 #include "app.h"
+#include "config/default/driver/spi/drv_spi.h"
+#include "config/default/driver/spi/drv_spi_definitions.h"
 #include "config/default/driver/i2c/drv_i2c.h"
 #include "config/default/driver/i2c/drv_i2c_definitions.h"
 #include "config/default/peripheral/i2c/plib_i2c4.h"
@@ -574,13 +576,11 @@ if_vm_dac_op (uint32_t address, uint32_t length)
 	
 	if (IF_CMD_WRITE_REGS == if_data.rx_msg.command)
 	{
-		memcpy(&(if_data.vm_dac_buf[address]), if_data.rx_msg.var_data, length);
-		if_vm_respstp(length);
+		// not implemented
 	}
 	else if (IF_CMD_READ_REGS == if_data.rx_msg.command)
 	{
-		if_vm_respstp(length);
-		if_data.tx_msg.var_data = &(if_data.vm_dac_buf[address]);
+		// not implemented
 	}
 }
 
@@ -595,12 +595,31 @@ if_vm_fpga_op (uint32_t address, uint32_t length)
 	{
 		memcpy(&(if_data.vm_fpga_buf[address]), if_data.rx_msg.var_data,
 			length);
-		if_vm_respstp(length);
+		
+		if (DRV_SPI_WriteTransfer(if_data.h_spi_fpga, if_data.vm_fpga_buf,
+			IF_VM_FPGA_LENGTH))
+		{
+			if_vm_respstp(length);
+		}
+		else
+		{
+			// spi failure for some reason
+			if_vm_respstp(0);
+		}
 	}
 	else if (IF_CMD_READ_REGS == if_data.rx_msg.command)
 	{
-		if_vm_respstp(length);
-		if_data.tx_msg.var_data = &(if_data.vm_fpga_buf[address]);
+		if (DRV_SPI_ReadTransfer(if_data.h_spi_fpga, if_data.vm_fpga_buf,
+			IF_VM_FPGA_LENGTH))
+		{
+			if_vm_respstp(length);
+			if_data.tx_msg.var_data = &(if_data.vm_fpga_buf[address]);
+		}
+		else
+		{
+			// spi failure for some reason
+			if_vm_respstp(0);
+		}
 	}
 }
 
@@ -611,15 +630,42 @@ if_vm_afe_op (uint32_t address, uint32_t length)
 	// This MUST only be called by if_vm_dispatch, as all the parameter
 	// validation is done there.
 	
+	uint8_t flip[2];
+	uint8_t read[2] = { 0 };
+	
 	if (IF_CMD_WRITE_REGS == if_data.rx_msg.command)
 	{
-		memcpy(&(if_data.vm_afe_buf[address]), if_data.rx_msg.var_data, length);
-		if_vm_respstp(length);
+		memcpy(&(if_data.vm_afe_buf[address]), if_data.rx_msg.var_data,
+			length);
+		flip[0] = cbs_reverse(if_data.vm_afe_buf[1]);
+		flip[1] = cbs_reverse(if_data.vm_afe_buf[0]);
+		flip[0] |= 0b10000000;
+		
+		if (DRV_SPI_WriteTransfer(if_data.h_spi_afe, flip, 2))
+		{
+			if_vm_respstp(length);
+		}
+		else
+		{
+			// spi failure for some reason
+			if_vm_respstp(0);
+		}
 	}
 	else if (IF_CMD_READ_REGS == if_data.rx_msg.command)
 	{
-		if_vm_respstp(length);
-		if_data.tx_msg.var_data = &(if_data.vm_afe_buf[address]);
+		if (DRV_SPI_WriteReadTransfer(if_data.h_spi_afe, read, 2, flip, 2))
+		{
+			if_data.vm_afe_buf[0] = cbs_reverse(flip[1]);
+			if_data.vm_afe_buf[1] = cbs_reverse(flip[0]);
+			
+			if_vm_respstp(length);
+			if_data.tx_msg.var_data = &(if_data.vm_afe_buf[address]);
+		}
+		else
+		{
+			// spi failure for some reason
+			if_vm_respstp(0);
+		}
 	}
 }
 

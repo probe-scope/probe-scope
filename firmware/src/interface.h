@@ -180,10 +180,6 @@ typedef struct
 	uint8_t         vm_dac_buf [IF_VM_DAC_LENGTH];
 	uint8_t         vm_fpga_buf[IF_VM_FPGA_LENGTH];
 	uint8_t         vm_afe_buf [IF_VM_AFE_LENGTH];
-	
-	DRV_I2C_TRANSFER_HANDLE * const ht_i2c_dac;
-	DRV_SPI_TRANSFER_HANDLE * const ht_spi_fpga;
-	DRV_SPI_TRANSFER_HANDLE * const ht_spi_afe;
 } if_data_t;
 
 
