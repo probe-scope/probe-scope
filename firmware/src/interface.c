@@ -21,6 +21,7 @@
 #include "config/default/peripheral/i2c/plib_i2c4.h"
 #include "config/default/peripheral/i2c/plib_i2c_master.h"
 #include "FreeRTOS.h"
+#include "ccbysa3.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -573,10 +574,86 @@ if_vm_dac_op (uint32_t address, uint32_t length)
 	// Process read/write command that maps to DAC memory.
 	// This MUST only be called by if_vm_dispatch, as all the parameter
 	// validation is done there.
+	uint8_t ibuf[8] = {0};
+	uint16_t countz[4] = {0};
+	uint16_t addr = DAC_ADDRESS;
 	
 	if (IF_CMD_WRITE_REGS == if_data.rx_msg.command)
 	{
-		// not implemented
+		// Minimalist implementation: write 0xAA to first virtual address and
+		// the PIC will send out Mark's recommended values to the DAC.
+		// Memory mapping it will take a little more effort since it's not
+		// really set up that way on the DAC, for writes at least.
+		
+		memcpy(&(if_data.vm_dac_buf[address]), if_data.rx_msg.var_data,
+			length);
+		
+		if ((0 == address) && (0xAA == if_data.vm_dac_buf[0]))
+		{
+			// wait to update outputs
+			LDACn_Set();
+
+			// set vref
+			// A, B, C use internal 2.048V reference, D uses VDD (5V)
+			ibuf[0] = 0b10001110;
+			if (!DRV_I2C_WriteTransfer(if_data.h_i2c_dac, addr, ibuf, 1))
+			{
+				if_vm_respstp(0);
+				return;
+			}
+
+			// set gain to 1x for all
+			ibuf[0] = 0b11000000;
+			if (!DRV_I2C_WriteTransfer(if_data.h_i2c_dac, addr, ibuf, 1))
+			{
+				if_vm_respstp(0);
+				return;
+			}
+
+			// set outputs (fast write)
+			// A = 1200
+			// B = 1000
+			// C = 1012
+			// D = 255
+			// all PD = 0b00
+			countz[0] = cbs_endflip(1200);
+			countz[1] = cbs_endflip(1000);
+			countz[2] = cbs_endflip(1612);
+			countz[3] = cbs_endflip(0);
+			if (!DRV_I2C_WriteTransfer(if_data.h_i2c_dac, DAC_ADDRESS,
+				(void *) countz, 8))
+			{
+				if_vm_respstp(0);
+				return;
+			}
+
+			// update outputs
+			LDACn_Clear();
+
+			// Response of 0x55 is success, any other is failure
+			if_vm_respstp(0x55555555);
+		}
+		else if (2 == address && 8 == length)
+		{
+			// wait to update outputs
+			LDACn_Set();
+			
+			// set outputs (fast write)
+			countz[0] = cbs_endflip(((uint16_t *)if_data.vm_dac_buf)[1]);
+			countz[1] = cbs_endflip(((uint16_t *)if_data.vm_dac_buf)[2]);
+			countz[2] = cbs_endflip(((uint16_t *)if_data.vm_dac_buf)[3]);
+			countz[3] = cbs_endflip(((uint16_t *)if_data.vm_dac_buf)[4]);
+			if (!DRV_I2C_WriteTransfer(if_data.h_i2c_dac, DAC_ADDRESS,
+				(void *) countz, 8))
+			{
+				if_vm_respstp(0);
+				return;
+			}
+
+			// update outputs
+			LDACn_Clear();
+			if_vm_respstp(8);
+		}
 	}
 	else if (IF_CMD_READ_REGS == if_data.rx_msg.command)
 	{
@@ -599,7 +676,7 @@ if_vm_fpga_op (uint32_t address, uint32_t length)
 		if (DRV_SPI_WriteTransfer(if_data.h_spi_fpga, if_data.vm_fpga_buf,
 			IF_VM_FPGA_LENGTH))
 		{
-			if_vm_respstp(length);
+			if_vm_respstp(IF_VM_FPGA_LENGTH);
 		}
 		else
 		{
@@ -643,7 +720,7 @@ if_vm_afe_op (uint32_t address, uint32_t length)
 		
 		if (DRV_SPI_WriteTransfer(if_data.h_spi_afe, flip, 2))
 		{
-			if_vm_respstp(length);
+			if_vm_respstp(2);
 		}
 		else
 		{

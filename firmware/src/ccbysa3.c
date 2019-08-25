@@ -32,3 +32,11 @@ cbs_reverse (uint8_t b)
    b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
    return b;
 }
+
+uint16_t
+cbs_endflip (uint16_t v)
+{
+	uint16_t out = 0xFF00 & (v << 8);
+	out |= (0x00FF & (v >> 8));
+	return out;
+}

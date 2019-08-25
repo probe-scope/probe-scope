@@ -29,7 +29,8 @@ extern "C" {
 #endif
 
 
-uint8_t cbs_reverse (uint8_t b);
+uint8_t  cbs_reverse (uint8_t  b);
+uint16_t cbs_endflip (uint16_t v);
 
 
 #ifdef	__cplusplus
